@@ -1,7 +1,3 @@
-#
-# $Id$
-#
-
 package Time::Timecode;
 
 use strict;
@@ -342,7 +338,7 @@ __END__
 
 =head1 NAME
 
-Time::Timecode - Video timecode object
+Time::Timecode - Video timecode class
 
 =head1 SYNOPSIS
 

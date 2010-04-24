@@ -1,6 +1,6 @@
 =head1 NAME
 
-Time::Timecode - Video timecode object
+Time::Timecode - Video timecode class
 
 =head1 SYNOPSIS
 
