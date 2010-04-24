@@ -1,0 +1,7 @@
+MANIFEST
+Makefile.PL
+lib/Time/Timecode.pm
+t/01parsing.t
+t/02calculations.t
+t/03conversions.t
+t/util.pl
