@@ -1,0 +1,6 @@
+-------------------------
+2012-01-11	v0.3	
+-------------------------
+* to_string() now accepts strftime(3) style format strings and 
+  can use a default format
+* Support relational operators

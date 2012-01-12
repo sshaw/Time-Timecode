@@ -1,7 +1,11 @@
-MANIFEST
-Makefile.PL
+CHANGES
+INSTALL.SKIP
 lib/Time/Timecode.pm
+Makefile.PL
+MANIFEST
+README.pod
 t/01parsing.t
 t/02calculations.t
 t/03conversions.t
+t/04operators.t
 t/util.pl

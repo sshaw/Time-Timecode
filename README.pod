@@ -11,6 +11,7 @@ Time::Timecode - Video timecode class
  print $tc1;				     # 02:00:00:12
  print $tc1->hours;			     # 2
  print $tc1->hh;			     # shorthanded version
+ print $tc1->to_string('%Hh%Mm%S%Ff')	     # 2h0m0s12f
 
  my $tc2 = Time::Timecode->new('00:10:30:00', { fps => 25 } );
  print $tc2->total_frames;		     # 15750
@@ -19,11 +20,11 @@ Time::Timecode - Video timecode class
  $tc2 = Time::Timecode->new(1800); 	     # Total frames
  print $tc1 + $tc2; 			     # 02:01:00:12
 
- $tc1 = Time::Timecode->new('00:01:00;04');  # Dropframe ( see the ";" )
+ $tc1 = Time::Timecode->new('00:01:00;04');  # Dropframe (see the ";")
  print $tc1->is_dropframe;		     # 1
 
  my $diff = $tc1 - 1800;		     # Subtract 1800 frames
- print $tc1->is_dropframe;		     # Maintains LHS' opts
+ print $tc1->is_dropframe;		     # 1, maintains LHS' options
  print $diff;				     # 00:00:02;00
 
  my $opts = { delimiter => ',', frame_delimiter => '+' };
@@ -59,7 +60,7 @@ C<Time::Timecode> instances are immutable.
 =item C<new( TIMECODE [, OPTIONS ] )>
 
 Creates an immutable instance for C<TIMECODE> with the given set of C<OPTIONS>. 
-If no C<OPTIONS> are given the L<"package defaults"|/DEFAULTS> are used.
+If no C<OPTIONS> are given the L<package defaults|/DEFAULTS> are used.
 
 =back
 
@@ -84,11 +85,11 @@ C<TIMECODE> can be one of the following:
 
 B<Timecode strings with dropframe frame delimiters>
  
-In the video encoding world timecodes with a frame delimiter of '.' or ';' are 
+In the video encoding world timecodes with a frame delimiter of "." or ";" are considered
 dropframe. If either of these characters are used in the timecode string passed to C<new()>
 the resulting instance will dropframe.
 
-This can be overridden by setting the L<"dropframe argument"|/OPTIONS> to false. 
+This can be overridden by setting the L<dropframe argument|/OPTIONS> to false. 
 
 =back
 
@@ -98,19 +99,27 @@ C<OPTIONS> must be a hash reference containg any of the following:
 
 =over 4
 
-B<fps>: Frames per second, must be greater than 0. Decimal values 
+=item * fps: 
+
+Frames per second, must be greater than 0. Decimal values 
 are rounded 0 places when performing calculations: 29.976 becomes 30.
 Defaults to C<$Time::Timecode::DEFAULT_FPS>
 
-B<dropframe>: A boolean value denoting wheather or not the timecode 
+=item * dropframe: 
+
+A boolean value denoting wheather or not the timecode 
 is dropframe. Defaults to C<$Time::Timecode::DEFAULT_DROPFRAME>.
 
-B<delimiter>: The character used to delimit the timecode's hours, minutes, 
-and seconds. Use the B<frame_delimiter> option for delimiting the frames.
+=item * delimiter: 
+
+The character used to delimit the timecode's hours, minutes, 
+and seconds. Use the L<frame_delimiter> option for delimiting the frames.
 Defaults to C<$Time::Timecode::DEFAULT_DELIMITER>.
 
-B<frame_delimiter>: The character used to delimit the timecode's frames. 
-Use the B<delimiter> option for delimiting the rest of the timecode.
+=item * frame_delimiter: 
+
+The character used to delimit the timecode's frames. 
+Use the L<delimiter> option for delimiting the rest of the timecode.
 Defaults to C<$Time::Timecode::DEFAULT_FRAME_DELIMITER>.
 
 =back
@@ -121,64 +130,90 @@ All time part accessors return an integer.
 
 =over 2
 
-=item C<hours()>
+=item C<hours>
 
-=item C<hrs()>
+=item C<hrs>
 
-=item C<hh()>
+=item C<hh>
 
 Returns the hour part of the timecode 
 
-=item C<minutes()>
+=item C<minutes>
 
-=item C<mins()>
+=item C<mins>
 
-=item C<mm()>
+=item C<mm>
 
 Returns the mintue part of the timecode
 
-=item C<seconds()>
+=item C<seconds>
 
-=item C<secs()>
+=item C<secs>
 
-=item C<ss()>
+=item C<ss>
 
 Returns the second part of the timecode
 
-=item C<frames()>
+=item C<frames>
 
-=item C<ff()>
+=item C<ff>
 
 Returns the frame part of the timecode
 
-=item C<fps()>
+=item C<fps>
 
 Returns the frames per second
 
-=item C<to_string()>
+=item C<total_frames>
 
-Returns the timecode as string in a HH:MM:SS:FF format.
+Returns the timecode in frames
 
-The delimiter used to separate each portion of the timecode can vary.
-If the C<delimiter> or C<frame_delimiter> options were provided they 
-will be used here. If the timecode was created from a timecode string
-that representation will be reconstructed.
+=item C<to_string([FORMAT])>
+
+Returns the timecode as string described C<FORMAT>. If C<FORMAT> is not provided the 
+string will be constructed according to the L<instance's defaults/DEFAULTS>.
+
+  $tc = Time::Timecode->new(2,0,10,24);
+  $tc->to_string			# 02:00:10:24
+  "$tc"					# Same as above
+  $tc->to_string('%H%M%S.%03F DF')	# 020010.024 DF
+
+C<FORMAT> is string of format characters synonymous (mostly, in some way) with 
+those used by <strftime(3)>:
+
+%H B<H>ours
+
+%M B<M>inutes
+
+%S B<S>econds
+
+%f B<f>rames
+
+%r Frame B<r>ate
+
+%T B<T>imecode in the L<instance's default format/DEFAULTS>.
+
+When applicable, formats assume the with of the number they represent.
+
+If a C<FORMAT> is not provided the delimiter used to separate each portion of the timecode can vary.
+If the C<delimiter> or C<frame_delimiter> options were provided they will be used here. 
+If the timecode was created from a timecode string that representation will be reconstructed.
 
 This method is overloaded. Using a C<Time::Timecode> instance in a scalar
-context results in a call to C<to_string()>.
+context results in a call to C<to_string>.
 
-=item C<is_dropframe()>
+=item C<is_dropframe>
 
 Returns a boolean value denoting whether or not the timecode is dropframe.
 
-=item C<to_non_dropframe()>
+=item C<to_non_dropframe>
 
 Converts the timecode to non-dropframe and returns a new C<Time::Timecode> instance.
 The framerate is not changed.
 
 If the current timecode is non-dropframe C<$self> is returned.
 
-=item C<to_dropframe()>
+=item C<to_dropframe>
 
 Converts the timecode to dropframe and returns a new C<Time::Timecode> instance.
 The framerate is not changed.
@@ -190,32 +225,68 @@ If the current timecode is dropframe C<$self> is returned.
 Converts the timecode to C<FPS> and returns a new instance.
 
 C<OPTIONS> are the same as L<those allowed by the CONSTRUCTOR|/OPTIONS>. Any unspecified options 
-are taken from the calling instance.
+will be taken from the calling instance.
 
 The converted timecode will be non-dropframe.
 
 =back
 
-=head1 ARITHMATIC
+=head1 ARITHMETIC & COMPARISON
 
-=over 2
+Arithmatic and comparison are provided via operator overloading. When applicable results get 
+their L<options/OPTIONS> from the left hand side (LHS) of the expression. If the LHS is a 
+literal the options will be taken from the right hand side.
 
-=item Addition
+=head2 Supported Operations
 
-=item Subtraction
+=head3 Addition
 
-=item Multiplacation
+  $tc1 = Time::Timecode->new(1800);
+  $tc2 = Time::Timecode->new(1);
+  print $tc1 + $tc2;
+  print $tc1 + 1800; 		
+  print 1800 + $tc1;	 	
+  print $tc1 + '00:10:00:00'; 	
 
-=item Division
+=head3 Subtraction
 
-All results get their options from the left hand side (LHS) of the expression. If LHS 
-is a literal, options will be taken from RHS.
+  $tc1 = Time::Timecode->new(3600);
+  $tc2 = Time::Timecode->new(1);
+  print $tc1 - $tc2;
+  print $tc1 - 1800; 		
+  print 1800 - $tc1;	 	
+  print $tc1 - '00:00:02:00'; 	
 
-=back
+=head3 Multiplacation
+
+  $tc1 = Time::Timecode->new(1800);
+  print $tc1 * 2;
+  print 2 * $tc1;
+
+=head3 Division
+
+  $tc1 = Time::Timecode->new(1800);
+  print $tc1 / 2;
+
+=head3 Pre/postincrement with/without asignment
+
+  $tc1 = Time::Timecode->new(1800);
+  $tc1 += 10;		# Add 10 frames
+  print ++$tc1;		# Add 1 frame
+  print $tc1--;		# Subtract it after printing
+ 
+=head3 All comparision operators
+
+  $tc1 = Time::Timecode->new(1800);
+  $tc2 = Time::Timecode->new(1800);
+  print 'equal!' if $tc1 == $tc2;
+  print 'less than' if $tc1 < '02:00:12;22';
+  print 'greater than' if $tc1 >= '02:00:12;22';
+  # ....
 
 =head1 DEFAULTS
 
-These can be overridden L<when creating a new instance|/CONSTRUCTOR>.
+These can be overridden when L<creating a new instance|/CONSTRUCTOR>.
 
 C<$DEFAULT_FPS = 29.97>
 
@@ -225,9 +296,15 @@ C<$DEFAULT_DELIMITER = ':'>
 
 C<$DEFAULT_FRAME_DELIMITER = ':'>
 
+C<$DEFAULT_TO_STRING_FORMAT = '%02s%s%02s%s%02s%s%02s'>
+
 =head1 AUTHOR
 
 Skye Shaw (sshaw AT lucas.cis.temple.edu)
+
+=head1 CREDITS
+
+Jinha Kim for schooling me on dropframe timecodes.
 
 =head1 REFERENCES
 
