@@ -1,13 +1,12 @@
 use Test;
 use Time::Timecode;
-
-require 't/util.pl';
+use TestHelper;
 
 BEGIN { plan tests => 31 }
 
 my $tc = Time::Timecode->new(30); #total frames
 
-#check method alias
+# Check method aliases
 ok($tc->hh, 0);
 ok($tc->mm, 0);
 ok($tc->ss, 1);
@@ -26,7 +25,7 @@ $tc = Time::Timecode->new($tc->total_frames);
 hmsf_ok($tc, 1, 10, 20, 29);
 ok($tc->total_frames, 126629);
 
-#compare drop/non-drop calculations
+# Compare drop/non-drop calculations
 $tc = Time::Timecode->new(0, 1, 0, 2, { dropframe => 1 });
 hmsf_ok($tc, 0, 1, 0, 2);
 ok($tc->total_frames, 1800);

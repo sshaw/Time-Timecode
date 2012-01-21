@@ -1,3 +1,10 @@
+package TestHelper;
+
+use Test;
+use base 'Exporter';
+
+our @EXPORT = 'hmsf_ok';
+
 sub hmsf_ok
 {
     my $tc = shift;

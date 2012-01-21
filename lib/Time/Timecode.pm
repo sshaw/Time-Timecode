@@ -15,15 +15,17 @@ use Carp ();
 
 # TODO: pre Perl 5.8 tests fail
 
-our $VERSION = '0.3';
+our $VERSION = '0.03';
+
 our $DEFAULT_FPS = 30;
 our $DEFAULT_DROPFRAME = 0;
 our $DEFAULT_DELIMITER = ':';
 our $DEFAULT_FRAME_DELIMITER = $DEFAULT_DELIMITER;
-our $DEFAULT_TO_STRING_FORMAT = '%02s%s%02s%s%02s%s%02s'; #HH:MM:SS:FF
+our $DEFAULT_TO_STRING_FORMAT = ''; # If not set $TO_STRING_FORMAT is used 
 
 my $SECONDS_PER_MINUTE = 60;
 my $SECONDS_PER_HOUR   = $SECONDS_PER_MINUTE * 60;
+my $TO_STRING_FORMAT = '%02s%s%02s%s%02s%s%02s'; #HH:MM:SS:FF
 
 my $TIME_PART = qr|[0-5]\d|;
 my $DROP_FRAME_DELIMITERS = '.;';
@@ -52,29 +54,29 @@ sub new
 
     my $class   = shift;
     my $options = ref($_[-1]) eq 'HASH' ? pop : {};
-    my $self    = bless { is_dropframe      => $options->{dropframe},   
-			  frame_delimiter   => $options->{frame_delimiter},
-			  delimiter         => $options->{delimiter} || $DEFAULT_DELIMITER,       
-			  fps               => $options->{fps}       || $DEFAULT_FPS }, $class;
+    my $self    = bless { is_dropframe      => $options->{dropframe},
+                          frame_delimiter   => $options->{frame_delimiter},
+                          delimiter         => $options->{delimiter} || $DEFAULT_DELIMITER,
+                          fps               => $options->{fps}       || $DEFAULT_FPS }, $class;
 
     Carp::croak "Invalid fps '$self->{fps}': fps must be an integer >= 0" unless $self->{fps} =~ /\A\d+(?:\.\d+)?\z/;
 
     if(@_ == 1 && $_[0] !~ /^\d+$/) {
-	$self->_timecode_from_string( shift );
+        $self->_timecode_from_string( shift );
     }
     else {
-	# For string timecodes these can be derrived by their format
-	$self->{is_dropframe} = $DEFAULT_DROPFRAME unless defined $self->{is_dropframe};
-	$self->{frame_delimiter} ||= $DEFAULT_FRAME_DELIMITER;
-	    
-	if(@_ == 1) {
-	    $self->_timecode_from_total_frames( shift );
-	}
-	else {
-   	    # Add frames if necessary
-	    push @_, 0 unless @_ == 4; 
-	    $self->_set_and_validate_time(@_);
-	}
+        # For string timecodes these can be derrived by their format
+        $self->{is_dropframe} = $DEFAULT_DROPFRAME unless defined $self->{is_dropframe};
+        $self->{frame_delimiter} ||= $DEFAULT_FRAME_DELIMITER;
+
+        if(@_ == 1) {
+            $self->_timecode_from_total_frames( shift );
+        }
+        else {
+            # Add frames if necessary
+            push @_, 0 unless @_ == 4;
+            $self->_set_and_validate_time(@_);
+        }
     }
 
     $self;
@@ -82,31 +84,30 @@ sub new
 
 sub to_string
 {
-    my ($self, $format) = @_;
-    my $tc = sprintf $DEFAULT_TO_STRING_FORMAT, $self->hours,
-						$self->{delimiter},
-						$self->minutes,
-						$self->{delimiter},
-						$self->seconds,
-						$self->{frame_delimiter},
-						$self->frames;
-    
-    if($format) {
-	my @args;
-	my %times = (H => $self->hours,
-		     M => $self->minutes,
-		     S => $self->seconds,
-		     f => $self->frames,
-		     r => $self->fps,
-		     T => $tc);
-	
-	# Match printf style formats with optional width and alignment.
-	# Ignore percent escapes followed by a valid format char.  
-	while($format =~ s/(?<!%)(%-?\d*)([THMSfr])/${1}s/) {
-	    push @args, $times{$2};
-	}
+    my $self   = shift;
+    my $format = shift || $DEFAULT_TO_STRING_FORMAT;
+    my $tc     = sprintf $TO_STRING_FORMAT, $self->hours,
+                                            $self->{delimiter},
+                                            $self->minutes,
+                                            $self->{delimiter},
+                                            $self->seconds,
+                                            $self->{frame_delimiter},
+                                            $self->frames;
 
-	$tc = sprintf $format, @args;
+    if($format) {
+        my @args;
+        # TODO: Add %X too?
+        my %formats = (H => $self->hours,
+                       M => $self->minutes,
+                       S => $self->seconds,
+                       f => $self->frames,
+                       r => $self->fps,
+		       i => $self->total_frames,
+                       T => $tc,
+                       '%'=> '%');
+
+        # Match printf style formats with optional width and alignment.
+        ($tc = $format) =~ s/(%-?\d*)([THMSfri%])/sprintf "${1}s", $formats{$2}/ge
     }
 
     $tc;
@@ -150,28 +151,28 @@ sub to_non_dropframe
 sub _add
 {
     _handle_binary_overload(@_, sub {
-	$_[0] + $_[1];
+        $_[0] + $_[1];
     });
 }
 
 sub _subtract
 {
     _handle_binary_overload(@_, sub {
-	$_[0] - $_[1];
+        $_[0] - $_[1];
     });
 }
 
 sub _multiply
 {
     _handle_binary_overload(@_, sub {
-	$_[0] * $_[1];
+        $_[0] * $_[1];
     });
 }
 
 sub _divide
 {
     _handle_binary_overload(@_, sub {
-	int($_[0] / $_[1]);
+        int($_[0] / $_[1]);
     });
 }
 
@@ -192,7 +193,7 @@ sub _overload_order
 sub _handle_binary_overload
 {
     my $fx = pop @_;
-    my ($lhs, $rhs) = _overload_order(@_);     
+    my ($lhs, $rhs) = _overload_order(@_);
     Time::Timecode->new($fx->($lhs->total_frames, $rhs->total_frames), $lhs->_dup_options);
 }
 
@@ -207,11 +208,11 @@ sub _dup_options
 
 # We work with 10 minute blocks of frames to accommodate dropframe calculations.
 # Dropframe timecodes call for 2 frames to be added every minute except on the 10th minute.
-# See REFERENCES in the below POD. 
+# See REFERENCES in the below POD.
 sub _frames_per_hour
 {
     my $self = shift;
-    my $fph = $self->_rounded_fps * $SECONDS_PER_HOUR;
+    my $fph  = $self->_rounded_fps * $SECONDS_PER_HOUR;
 
     $fph -= 108 if $self->is_dropframe;
     $fph;
@@ -220,7 +221,7 @@ sub _frames_per_hour
 sub _frames_per_minute
 {
     my $self = shift;
-    my $fpm = $self->_rounded_fps * $SECONDS_PER_MINUTE;
+    my $fpm  = $self->_rounded_fps * $SECONDS_PER_MINUTE;
 
     $fpm -= 2 if $self->is_dropframe;
     $fpm;
@@ -229,7 +230,7 @@ sub _frames_per_minute
 sub _frames_per_ten_minutes
 {
     my $self = shift;
-    my $fpm = $self->_rounded_fps * $SECONDS_PER_MINUTE * 10;
+    my $fpm  = $self->_rounded_fps * $SECONDS_PER_MINUTE * 10;
 
     $fpm -= 18 if $self->is_dropframe;
     $fpm;
@@ -306,20 +307,20 @@ sub _set_and_validate_time
 
     # These 2 statements are used for calculating dropframe timecodes. They do not affect non-dropframe calculations.
     $total += int($self->minutes / 10) * $self->_frames_per_ten_minutes;
-    $total += $self->minutes % 10 * $self->_frames_per_minute;   
+    $total += $self->minutes % 10 * $self->_frames_per_minute;
 
     $total += $self->hours * $self->_frames_per_hour;
 
-    Carp::croak "Invalid dropframe timecode: '$self'" unless $self->_valid_dropframe_timecode;  
+    Carp::croak "Invalid dropframe timecode: '$self'" unless $self->_valid_dropframe_timecode;
     $self->{total_frames} = $total;
 }
 
 sub _valid_dropframe_timecode
 {
     my $self = shift;
-    !($self->is_dropframe 
-      && $self->seconds == 0 
-      && ($self->frames == 0 || $self->frames == 1) 
+    !($self->is_dropframe
+      && $self->seconds == 0
+      && ($self->frames == 0 || $self->frames == 1)
       && ($self->minutes % 10 != 0));
 }
 
@@ -355,22 +356,24 @@ sub _timecode_from_string
     $frame_delim = '[' . quotemeta("$frame_delim") . ']';
 
     if($timecode =~ /^\s*($TIME_PART)$delim($TIME_PART)$delim($TIME_PART)($frame_delim)([0-5]\d)\s*([NDPF])?\s*$/) {
-	#TODO: Use suffix after frames to determine drop/non-drop -and possibly other things
-	if(!defined $self->{is_dropframe}) { 
-	    $self->{is_dropframe} = index($DROP_FRAME_DELIMITERS, $4) != -1 ? 1 : $DEFAULT_DROPFRAME;
-	}
+        #TODO: Use suffix after frames to determine drop/non-drop -and possibly other things
+        if(!defined $self->{is_dropframe}) {
+            $self->{is_dropframe} = index($DROP_FRAME_DELIMITERS, $4) != -1 ? 1 : $DEFAULT_DROPFRAME;
+        }
 
-	$self->{frame_delimiter} = $4 unless defined $self->{frame_delimiter};
-	$self->_set_and_validate_time($1, $2, $3, $5);
+        $self->{frame_delimiter} = $4 unless defined $self->{frame_delimiter};
+        $self->_set_and_validate_time($1, $2, $3, $5);
     }
     else {
-	Carp::croak "Can't create timecode from '$timecode'";
+        Carp::croak "Can't create timecode from '$timecode'";
     }
 }
 
 1;
 
 __END__
+
+=pod
 
 =head1 NAME
 
@@ -381,49 +384,49 @@ Time::Timecode - Video timecode class
  use Time::Timecode;
 
  my $tc1 = Time::Timecode->new(2, 0, 0, 12); # hh, mm, ss, ff
- print $tc1->fps;			     # $DEFAULT_FPS
- print $tc1;				     # 02:00:00:12
- print $tc1->hours;			     # 2
- print $tc1->hh;			     # shorthanded version
- print $tc1->to_string('%Hh%Mm%S%Ff')	     # 2h0m0s12f
+ print $tc1->fps;                            # $DEFAULT_FPS
+ print $tc1;                                 # 02:00:00:12
+ print $tc1->hours;                          # 2
+ print $tc1->hh;                             # shorthanded version
+ print $tc1->to_string('%Hh%Mm%Ss%ff')       # 2h0m0s12f
 
  my $tc2 = Time::Timecode->new('00:10:30:00', { fps => 25 } );
- print $tc2->total_frames;		     # 15750
- print $tc2->fps;			     # 25
+ print $tc2->total_frames;                   # 15750
+ print $tc2->fps;                            # 25
 
- $tc2 = Time::Timecode->new(1800); 	     # Total frames
- print $tc1 + $tc2; 			     # 02:01:00:12
+ $tc2 = Time::Timecode->new(1800);           # Total frames
+ print $tc1 + $tc2;                          # 02:01:00:12
 
  $tc1 = Time::Timecode->new('00:01:00;04');  # Dropframe (see the ";")
- print $tc1->is_dropframe;		     # 1
+ print $tc1->is_dropframe;                   # 1
 
- my $diff = $tc1 - 1800;		     # Subtract 1800 frames
- print $tc1->is_dropframe;		     # 1, maintains LHS' options
- print $diff;				     # 00:00:02;00
-
- my $opts = { delimiter => ',', frame_delimiter => '+' };
- $Time::Timecode::DEFAULT_FPS = 23.976;      
- $tc2 = Time::Timecode->new('00,10,30+00', $opts); 
- print $tc2->fps			     # 23.976
- print $tc2->minutes;			     # 10
- print $tc2->seconds;			     # 30
+ my $diff = $tc1 - 1800;                     # Subtract 1800 frames
+ print $tc1->is_dropframe;                   # 1, maintains LHS' options
+ print $diff;                                # 00:00:02;00
 
  # Conversions
  my $pal  = $tc->convert(25);
  my $ntsc = $pal->convert(30), { dropframe => 1 });
  my $ndf  = $ntsc->to_non_dropframe;
- 
+
+ my $opts = { delimiter => ',', frame_delimiter => '+' };
+ $Time::Timecode::DEFAULT_FPS = 23.976;
+ $tc2 = Time::Timecode->new('00,10,30+00', $opts);
+ print $tc2->fps                             # 23.976
+ print $tc2->minutes;                        # 10
+ print $tc2->seconds;                        # 30
+
 =head1 DESCRIPTION
 
-C<Time::Timecode> supports any frame rate, drop/non-drop frame counts, basic arithmetic, 
-and conversion between frame rates and drop/non-drop frame counts. The only 
-requirements are that the timecode be between 00:00:00:00 and 99:99:99:99, 
-inclusive, and frames per second (fps) are greater than zero. This means that 
-you can create nonstandard timecodes (feature or bug? :^). Dropframe rules will still 
+C<Time::Timecode> supports any frame rate, drop/non-drop frame counts, basic arithmetic,
+and conversion between frame rates and drop/non-drop frame counts. The only
+requirements are that the timecode be between 00:00:00:00 and 99:99:99:99,
+inclusive, and frames per second (fps) are greater than zero. This means that
+you can create nonstandard timecodes (feature or bug? :^). Dropframe rules will still
 apply.
 
-C<Time::Timecode> instances can be created from a a variety of representations, 
-see L</CONSTRUCTOR>. 
+C<Time::Timecode> instances can be created from a a variety of representations,
+see L</CONSTRUCTOR>.
 
 C<Time::Timecode> instances are immutable.
 
@@ -433,12 +436,12 @@ C<Time::Timecode> instances are immutable.
 
 =item C<new( TIMECODE [, OPTIONS ] )>
 
-Creates an immutable instance for C<TIMECODE> with the given set of C<OPTIONS>. 
+Creates an immutable instance for C<TIMECODE> with the given set of C<OPTIONS>.
 If no C<OPTIONS> are given the L<package defaults|/DEFAULTS> are used.
 
 =back
 
-=head2 TIMECODE 
+=head2 TIMECODE
 
 C<TIMECODE> can be one of the following:
 
@@ -458,41 +461,41 @@ C<TIMECODE> can be one of the following:
  $tc1 = Time::Timecode->new('00:02:00:25')
 
 B<Timecode strings with dropframe frame delimiters>
- 
+
 In the video encoding world timecodes with a frame delimiter of "." or ";" are considered
-dropframe. If either of these characters are used in the timecode string passed to C<new()>
+dropframe. If either of these characters are used in the timecode string passed to C<new>
 the resulting instance will dropframe.
 
-This can be overridden by setting the L<dropframe argument|/OPTIONS> to false. 
+This can be overridden by setting the L<dropframe argument|/OPTIONS> to false.
 
 =back
 
 =head2 OPTIONS
 
-C<OPTIONS> must be a hash reference containg any of the following:
+C<OPTIONS> must be a hash reference and can contain any of the following:
 
 =over 4
 
-=item * fps: 
+=item * fps:
 
-Frames per second, must be greater than 0. Decimal values 
+Frames per second, must be greater than 0. Decimal values
 are rounded 0 places when performing calculations: 29.976 becomes 30.
 Defaults to C<$Time::Timecode::DEFAULT_FPS>
 
-=item * dropframe: 
+=item * dropframe:
 
-A boolean value denoting wheather or not the timecode 
+A boolean value denoting wheather or not the timecode
 is dropframe. Defaults to C<$Time::Timecode::DEFAULT_DROPFRAME>.
 
-=item * delimiter: 
+=item * delimiter:
 
-The character used to delimit the timecode's hours, minutes, 
+The character used to delimit the timecode's hours, minutes,
 and seconds. Use the L<frame_delimiter> option for delimiting the frames.
 Defaults to C<$Time::Timecode::DEFAULT_DELIMITER>.
 
-=item * frame_delimiter: 
+=item * frame_delimiter:
 
-The character used to delimit the timecode's frames. 
+The character used to delimit the timecode's frames.
 Use the L<delimiter> option for delimiting the rest of the timecode.
 Defaults to C<$Time::Timecode::DEFAULT_FRAME_DELIMITER>.
 
@@ -500,7 +503,8 @@ Defaults to C<$Time::Timecode::DEFAULT_FRAME_DELIMITER>.
 
 =head1 METHODS
 
-All time part accessors return an integer.
+All time part accessors return an integer except C<frames> which, depending on the
+frame rate, can return a float.
 
 =over 2
 
@@ -510,7 +514,7 @@ All time part accessors return an integer.
 
 =item C<hh>
 
-Returns the hour part of the timecode 
+Returns the hour part of the timecode
 
 =item C<minutes>
 
@@ -544,16 +548,20 @@ Returns the timecode in frames
 
 =item C<to_string([FORMAT])>
 
-Returns the timecode as string described C<FORMAT>. If C<FORMAT> is not provided the 
+Returns the timecode as string described by C<FORMAT>. If C<FORMAT> is not provided the
 string will be constructed according to the L<instance's defaults/DEFAULTS>.
 
   $tc = Time::Timecode->new(2,0,10,24);
   $tc->to_string			# 02:00:10:24
   "$tc"					# Same as above
-  $tc->to_string('%H%M%S.%03F DF')	# 020010.024 DF
+  $tc->to_string('%02H%02M%S.%03f DF')	# 020010.024 DF
 
-C<FORMAT> is string of format characters synonymous (mostly, in some way) with 
-those used by C<strftime(3)>:
+C<FORMAT> is string of characters synonymous (mostly, in some way) with
+those used by C<strftime(3)>, with the exception that no leading zero will be added
+to single digit values. If you want leading zeros you must specify a field width like 
+you would with C<< printf(3) >>.
+
+The following formats are supported:
 
 %H B<H>ours
 
@@ -563,18 +571,21 @@ those used by C<strftime(3)>:
 
 %f B<f>rames
 
+%i B<i>n frames (i.e., C<< $tc->total_frames >>)
+
 %r Frame B<r>ate
 
 %T B<T>imecode in the L<instance's default format/DEFAULTS>.
 
-When applicable, formats assume the with of the number they represent.
+%% Literal percent character
+
+When applicable, formats assume the width of the number they represent.
 
 If a C<FORMAT> is not provided the delimiter used to separate each portion of the timecode can vary.
-If the C<delimiter> or C<frame_delimiter> options were provided they will be used here. 
+If the C<delimiter> or C<frame_delimiter> options were provided they will be used here.
 If the timecode was created from a timecode string that representation will be reconstructed.
 
-This method is overloaded. Using a C<Time::Timecode> instance in a scalar
-context results in a call to C<to_string>.
+This method is overloaded. 
 
 =item C<is_dropframe>
 
@@ -598,7 +609,7 @@ If the current timecode is dropframe C<$self> is returned.
 
 Converts the timecode to C<FPS> and returns a new instance.
 
-C<OPTIONS> are the same as L<those allowed by the CONSTRUCTOR|/OPTIONS>. Any unspecified options 
+C<OPTIONS> are the same as L<those allowed by the CONSTRUCTOR|/OPTIONS>. Any unspecified options
 will be taken from the calling instance.
 
 The converted timecode will be non-dropframe.
@@ -607,8 +618,8 @@ The converted timecode will be non-dropframe.
 
 =head1 ARITHMETIC & COMPARISON
 
-Arithmatic and comparison are provided via operator overloading. When applicable results get 
-their L<options/OPTIONS> from the left hand side (LHS) of the expression. If the LHS is a 
+Arithmatic and comparison are provided via operator overloading. When applicable results get
+their L<options/OPTIONS> from the left hand side (LHS) of the expression. If the LHS is a
 literal the options will be taken from the right hand side.
 
 =head2 Supported Operations
@@ -618,20 +629,20 @@ literal the options will be taken from the right hand side.
   $tc1 = Time::Timecode->new(1800);
   $tc2 = Time::Timecode->new(1);
   print $tc1 + $tc2;
-  print $tc1 + 1800; 		
-  print 1800 + $tc1;	 	
-  print $tc1 + '00:10:00:00'; 	
+  print $tc1 + 1800;
+  print 1800 + $tc1;
+  print $tc1 + '00:10:00:00';
 
 =head3 Subtraction
 
   $tc1 = Time::Timecode->new(3600);
   $tc2 = Time::Timecode->new(1);
   print $tc1 - $tc2;
-  print $tc1 - 1800; 		
-  print 1800 - $tc1;	 	
-  print $tc1 - '00:00:02:00'; 	
+  print $tc1 - 1800;
+  print 1800 - $tc1;
+  print $tc1 - '00:00:02:00';
 
-=head3 Multiplacation
+=head3 Multiplication
 
   $tc1 = Time::Timecode->new(1800);
   print $tc1 * 2;
@@ -642,14 +653,14 @@ literal the options will be taken from the right hand side.
   $tc1 = Time::Timecode->new(1800);
   print $tc1 / 2;
 
-=head3 Pre/postincrement with/without asignment
+=head3 Pre/postincrement with/without assignment
 
   $tc1 = Time::Timecode->new(1800);
   $tc1 += 10;		# Add 10 frames
   print ++$tc1;		# Add 1 frame
   print $tc1--;		# Subtract it after printing
- 
-=head3 All comparision operators
+
+=head3 All comparison operators
 
   $tc1 = Time::Timecode->new(1800);
   $tc2 = Time::Timecode->new(1800);
@@ -660,7 +671,8 @@ literal the options will be taken from the right hand side.
 
 =head1 DEFAULTS
 
-These can be overridden when L<creating a new instance|/CONSTRUCTOR>.
+All defaults except C<$DEFAULT_TO_STRING_FORMAT> can be overridden when L<creating a new instance|/CONSTRUCTOR>.
+C<$DEFAULT_TO_STRING_FORMAT> can be overridden by calling passing a format to L<< /C<to_string> >>.
 
 C<$DEFAULT_FPS = 29.97>
 
@@ -670,7 +682,7 @@ C<$DEFAULT_DELIMITER = ':'>
 
 C<$DEFAULT_FRAME_DELIMITER = ':'>
 
-C<$DEFAULT_TO_STRING_FORMAT = '%02s%s%02s%s%02s%s%02s'>
+C<$DEFAULT_TO_STRING_FORMAT = 'HHxMMxSSxFF'>  where C<x> represents the instance's frame and time separators.
 
 =head1 AUTHOR
 
@@ -687,6 +699,9 @@ L<http://dropframetimecode.org/>, L<http://en.wikipedia.org/wiki/SMPTE_time_code
 
 =head1 COPYRIGHT
 
-Copyright (c) 2009-2010 Skye Shaw. All rights reserved. This program
-is free software; you can redistribute it and/or modify it under the
+Copyright (c) 2009-2012 Skye Shaw. All rights reserved.
+
+=head1 LICENSE
+
+This program is free software; you can redistribute it and/or modify it under the
 same terms as Perl itself.

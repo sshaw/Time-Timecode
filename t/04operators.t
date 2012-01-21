@@ -1,7 +1,6 @@
 use Test;
 use Time::Timecode;
-
-require 't/util.pl';
+use TestHelper; 
 
 BEGIN { plan tests => 47 }
 
