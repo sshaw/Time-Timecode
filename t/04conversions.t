@@ -24,4 +24,4 @@ ok($tc->fps, 30);
 hmsf_ok($tc,0,1,0,2);
 ok($tc->total_frames, 1800);
 ok($tc->is_dropframe);
-ok($tc->to_string, '00:01:00.02');
+ok("$tc", '00:01:00.02');

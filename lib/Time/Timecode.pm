@@ -13,8 +13,6 @@ use overload
 
 use Carp ();
 
-# TODO: pre Perl 5.8 tests fail
-
 our $VERSION = '0.03';
 
 our $DEFAULT_FPS = 30;
@@ -59,7 +57,7 @@ sub new
                           delimiter         => $options->{delimiter} || $DEFAULT_DELIMITER,
                           fps               => $options->{fps}       || $DEFAULT_FPS }, $class;
 
-    Carp::croak "Invalid fps '$self->{fps}': fps must be an integer >= 0" unless $self->{fps} =~ /\A\d+(?:\.\d+)?\z/;
+    Carp::croak "Invalid fps '$self->{fps}': fps must be >= 0" unless $self->{fps} =~ /\A\d+(?:\.\d+)?\z/;
 
     if(@_ == 1 && $_[0] !~ /^\d+$/) {
         $self->_timecode_from_string( shift );
@@ -672,7 +670,7 @@ literal the options will be taken from the right hand side.
 =head1 DEFAULTS
 
 All defaults except C<$DEFAULT_TO_STRING_FORMAT> can be overridden when L<creating a new instance|/CONSTRUCTOR>.
-C<$DEFAULT_TO_STRING_FORMAT> can be overridden by calling passing a format to L<< /C<to_string> >>.
+C<$DEFAULT_TO_STRING_FORMAT> can be overridden by passing a format to L<< /C<to_string> >>.
 
 C<$DEFAULT_FPS = 29.97>
 
