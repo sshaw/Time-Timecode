@@ -2,10 +2,11 @@ CHANGES
 INSTALL.SKIP
 lib/Time/Timecode.pm
 Makefile.PL
-MANIFEST
+MANIFEST			This list of files
 README.pod
-t/01parsing.t
-t/02calculations.t
-t/03conversions.t
-t/04operators.t
-t/util.pl
+t/01calculations.t
+t/02parsing.t
+t/03to_string.t
+t/04conversions.t
+t/05defaults.t
+t/TestHelper.pm
