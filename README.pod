@@ -313,8 +313,6 @@ from the command line:
       -v --version           print version information
 
   If no timecode is given timecodes will be read from stdin.
-  For more info and examples visit: https://github.com/sshaw/Time-Timecode
-
 
 =head2 Examples
 
@@ -325,7 +323,7 @@ from the command line:
 
 =head3 Convert 24 to 29.97 drop and output the result as frames
 
-  timecode -i 24 -c 29.97d  -f %i 00:12:33:19
+  timecode -i 24 -c 29.97d -f %i 00:12:33:19
   18091
 
 =head3 Convert a list of timecodes from a file to a custom format, ignoring invalid timecodes
@@ -364,8 +362,8 @@ Skye Shaw (skye.shaw -AT- gmail)
 
 Jinha Kim for schooling me on dropframe timecodes.
 
-L<http://andrewduncan.net/|Andrew Duncan> (and L<http://www.davidheidelberger.com/|David Heidelberger>)
-for the L<http://www.davidheidelberger.com/blog/?p=29|nice drop frame algorithm>.
+L<Andrew Duncan|http://andrewduncan.net/> (and L<David Heidelberger|http://www.davidheidelberger.com/>)
+for the L<nice drop frame algorithm|http://www.davidheidelberger.com/blog/?p=29>.
 
 =head1 REFERENCES
 
