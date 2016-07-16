@@ -11,22 +11,23 @@ use overload
     '<=>' => '_compare',
     '""'  => 'to_string';
 
+use POSIX ();
 use Carp ();
 
-our $VERSION = '0.03';
+our $VERSION = '0.30';
 
-our $DEFAULT_FPS = 30;
+our $DEFAULT_FPS = 29.97;
 our $DEFAULT_DROPFRAME = 0;
 our $DEFAULT_DELIMITER = ':';
 our $DEFAULT_FRAME_DELIMITER = $DEFAULT_DELIMITER;
-our $DEFAULT_TO_STRING_FORMAT = ''; # If not set $TO_STRING_FORMAT is used 
+our $DEFAULT_TO_STRING_FORMAT = ''; # If not set $TO_STRING_FORMAT is used
 
 my $SECONDS_PER_MINUTE = 60;
 my $SECONDS_PER_HOUR   = $SECONDS_PER_MINUTE * 60;
 my $TO_STRING_FORMAT = '%02s%s%02s%s%02s%s%02s'; #HH:MM:SS:FF
 
 my $TIME_PART = qr|[0-5]\d|;
-my $DROP_FRAME_DELIMITERS = '.;';
+my $DROP_FRAME_DELIMITERS = '.;'; #, too?
 my $FRAME_PART_DELIMITERS = "${DEFAULT_DELIMITER}${DROP_FRAME_DELIMITERS}";
 
 {
@@ -52,10 +53,10 @@ sub new
 
     my $class   = shift;
     my $options = ref($_[-1]) eq 'HASH' ? pop : {};
-    my $self    = bless { is_dropframe      => $options->{dropframe},
-                          frame_delimiter   => $options->{frame_delimiter},
-                          delimiter         => $options->{delimiter} || $DEFAULT_DELIMITER,
-                          fps               => $options->{fps}       || $DEFAULT_FPS }, $class;
+    my $self    = bless { is_dropframe    => $options->{dropframe},
+                          frame_delimiter => $options->{frame_delimiter},
+                          delimiter       => $options->{delimiter} || $DEFAULT_DELIMITER,
+                          fps             => $options->{fps}       || $DEFAULT_FPS }, $class;
 
     Carp::croak "Invalid fps '$self->{fps}': fps must be >= 0" unless $self->{fps} =~ /\A\d+(?:\.\d+)?\z/;
 
@@ -68,13 +69,20 @@ sub new
         $self->{frame_delimiter} ||= $DEFAULT_FRAME_DELIMITER;
 
         if(@_ == 1) {
-            $self->_timecode_from_total_frames( shift );
+	    $self->_timecode_from_total_frames( shift );
         }
         else {
-            # Add frames if necessary
-            push @_, 0 unless @_ == 4;
-            $self->_set_and_validate_time(@_);
-        }
+	    # Add frames if necessary
+	    push @_, 0 unless @_ == 4;
+	    $self->_set_and_validate_time(@_);
+	}
+    }
+
+    if ($self->_is_deprecated_dropframe_rate) {
+      warn<<DEPRECATION;
+Time::Timecode warning: the next version will not treat drop frame 30 and 60 like 29.97 and 59.94.
+Continuing to use drop frame 30 or 60 will result in incorrect calculations. Use 29.97 or 59.94 instead.
+DEPRECATION
     }
 
     $self;
@@ -204,46 +212,26 @@ sub _dup_options
       frame_delimiter => $self->{frame_delimiter} };
 }
 
-# We work with 10 minute blocks of frames to accommodate dropframe calculations.
-# Dropframe timecodes call for 2 frames to be added every minute except on the 10th minute.
-# See REFERENCES in the below POD.
 sub _frames_per_hour
 {
-    my $self = shift;
-    my $fph  = $self->_rounded_fps * $SECONDS_PER_HOUR;
-
-    $fph -= 108 if $self->is_dropframe;
-    $fph;
+    shift->_rounded_fps * $SECONDS_PER_HOUR;
 }
 
 sub _frames_per_minute
 {
-    my $self = shift;
-    my $fpm  = $self->_rounded_fps * $SECONDS_PER_MINUTE;
-
-    $fpm -= 2 if $self->is_dropframe;
-    $fpm;
-}
-
-sub _frames_per_ten_minutes
-{
-    my $self = shift;
-    my $fpm  = $self->_rounded_fps * $SECONDS_PER_MINUTE * 10;
-
-    $fpm -= 18 if $self->is_dropframe;
-    $fpm;
+    shift->_rounded_fps * $SECONDS_PER_MINUTE;
 }
 
 sub _frames
 {
     my ($self, $frames) = @_;
-    $self->_frames_without_ten_minute_intervals($frames) % $self->_frames_per_minute % $self->_rounded_fps;
+    $frames % $self->_rounded_fps;
 }
 
 sub _rounded_fps
 {
     my $self = shift;
-    $self->{rounded_fps} ||= sprintf("%.0f", $self->fps);
+    $self->{rounded_fps} ||= POSIX::ceil($self->fps);
 }
 
 sub _hours_from_frames
@@ -255,21 +243,13 @@ sub _hours_from_frames
 sub _minutes_from_frames
 {
     my ($self, $frames) = @_;
-    my $minutes = int($frames % $self->_frames_per_hour);
-    int($self->_frames_without_ten_minute_intervals($frames) / $self->_frames_per_minute) + int($minutes / $self->_frames_per_ten_minutes) * 10;
-}
-
-# Needed to handle dropframe calculations
-sub _frames_without_ten_minute_intervals
-{
-    my ($self, $frames) = @_;
-    $frames % $self->_frames_per_hour % $self->_frames_per_ten_minutes;
+    int($frames % $self->_frames_per_hour / $self->_frames_per_minute);
 }
 
 sub _seconds_from_frames
 {
     my ($self, $frames) = @_;
-    int($self->_frames_without_ten_minute_intervals($frames) % $self->_frames_per_minute / $self->_rounded_fps);
+    int($frames % $self->_frames_per_minute / $self->_rounded_fps);
 }
 
 sub _valid_frames
@@ -291,23 +271,31 @@ sub _set_and_validate_time_part
     $self->{$part} = int($value); # Can be a string with a 0 prefix: 01, 02, etc...
 }
 
+sub _frames_to_drop {
+  my $self = shift;
+
+  if (!defined $self->{frames_to_drop}) {
+    $self->{frames_to_drop} = $self->is_dropframe ? POSIX::ceil($self->{fps}*0.066666) : 0;
+  }
+
+  $self->{frames_to_drop};
+}
+
 sub _set_and_validate_time
 {
     my ($self, $hh, $mm, $ss, $ff) = @_;
-
     $self->_set_and_validate_time_part('frames', $ff, \&_valid_frames);
     $self->_set_and_validate_time_part('seconds', $ss, \&_valid_time_part);
     $self->_set_and_validate_time_part('minutes', $mm, \&_valid_time_part);
     $self->_set_and_validate_time_part('hours', $hh, \&_valid_time_part);
 
     my $total = $self->frames;
-    $total += $self->seconds * $self->_rounded_fps;
+    $total += $self->_rounded_fps * $ss;
+    $total += $self->_frames_per_minute * $mm;
+    $total += $self->_frames_per_hour * $hh;
 
-    # These 2 statements are used for calculating dropframe timecodes. They do not affect non-dropframe calculations.
-    $total += int($self->minutes / 10) * $self->_frames_per_ten_minutes;
-    $total += $self->minutes % 10 * $self->_frames_per_minute;
-
-    $total += $self->hours * $self->_frames_per_hour;
+    my $total_minutes = $SECONDS_PER_MINUTE * $hh + $mm;
+    $total -= $self->_frames_to_drop * ( $total_minutes - int($total_minutes / 10) );
 
     Carp::croak "Invalid dropframe timecode: '$self'" unless $self->_valid_dropframe_timecode;
     $self->{total_frames} = $total;
@@ -326,13 +314,43 @@ sub _set_timecode_from_frames
 {
     my ($self, $frames) = @_;
 
+    # We need the true frame rate here, not the rounded
+    my $fps = $self->{fps};
+
+    # Support drop frame calculations for known frame rates that don't support them :(
+    # This is in place temporarily for backwards compatibility with $VERSION < 0.30,
+    if ($self->_is_deprecated_dropframe_rate) {
+        $fps = $self->{fps} == 30 ? 29.97 : 59.94;
+    }
+
+    #####
+    # Algorithm from: http://www.davidheidelberger.com/blog/?p=29
+    my $drop = $self->_frames_to_drop;
+
+    my $frames_per_ten_minutes = $fps * $SECONDS_PER_MINUTE * 10;
+    my $frames_per_minute = $self->_frames_per_minute - $drop;
+
+    my $d = int($frames / $frames_per_ten_minutes);
+    my $m = $frames % $frames_per_ten_minutes;
+
+    if($m > $drop) {
+        $frames += ($drop * 9 * $d) + $drop * int(($m - $drop) / $frames_per_minute);
+    }
+    else {
+        $frames += $drop * 9 * $d;
+    }
+    #####
+
     $self->_set_and_validate_time_part('frames', $self->_frames($frames), \&_valid_frames);
     $self->_set_and_validate_time_part('seconds', $self->_seconds_from_frames($frames), \&_valid_time_part);
     $self->_set_and_validate_time_part('minutes', $self->_minutes_from_frames($frames), \&_valid_time_part);
     $self->_set_and_validate_time_part('hours', $self->_hours_from_frames($frames), \&_valid_time_part);
+}
 
-    #Bump up to valid drop frame... ever?
-    $self->_set_timecode_from_frames($frames + 2) unless $self->_valid_dropframe_timecode
+sub _is_deprecated_dropframe_rate
+{
+  my $self = shift;
+  $self->is_dropframe && ($self->{fps} == 30 || $self->{fps} == 60);
 }
 
 sub _timecode_from_total_frames
@@ -358,7 +376,7 @@ sub _timecode_from_string
         if(!defined $self->{is_dropframe}) {
             $self->{is_dropframe} = index($DROP_FRAME_DELIMITERS, $4) != -1 ? 1 : $DEFAULT_DROPFRAME;
         }
-	
+
         $self->{frame_delimiter} = $4 unless defined $self->{frame_delimiter};
         $self->_set_and_validate_time($1, $2, $3, $5);
     }
@@ -476,9 +494,7 @@ C<OPTIONS> must be a hash reference and can contain any of the following:
 
 =item * fps:
 
-Frames per second, must be greater than 0. Decimal values
-are rounded 0 places when performing calculations: 29.976 becomes 30.
-Defaults to C<$Time::Timecode::DEFAULT_FPS>
+Frames per second, must be greater than 0. Defaults to C<$Time::Timecode::DEFAULT_FPS>
 
 =item * dropframe:
 
@@ -556,7 +572,7 @@ string will be constructed according to the L<instance's defaults|/DEFAULTS>.
 
 C<FORMAT> is string of characters synonymous (mostly, in some way) with
 those used by C<< strftime(3) >>, with the exception that no leading zero will be added
-to single digit values. If you want leading zeros you must specify a field width like 
+to single digit values. If you want leading zeros you must specify a field width like
 you would with C<< printf(3) >>.
 
 The following formats are supported:
@@ -666,6 +682,50 @@ literal the options will be taken from the right hand side.
   print 'less than' if $tc1 < '02:00:12;22';
   print 'greater than' if $tc1 >= '02:00:12;22';
   # ....
+
+=head1 Timecode Conversion Utility Program
+
+C<Time::Timecode> includes an executable called C<timecode> that allows one to perform timecode conversions:
+
+  usage: timecode [-h] [-c spec] [-f format] [-i spec] [timecode]
+      -h --help		   option help
+      -c --convert spec      convert timecode according to `spec'
+			     `spec' can be a number of FPS proceeded by an optional `N' or `ND' or, a comma
+			     separated list of key=value. key can be fps, dropframe, delimiter, frame_delimiter
+      -f --format  format    output timecode according to `format' e.g., '%H:%M:%S at %r FPS'.
+			     %H=hours, %M=minutes, %S=seconds, %f=frames %i=total frames, %r=frame rate
+      -i --input   spec      process incoming timecodes according to `spec'; see -c for more info
+      -q --quiet             ignore invalid timecodes
+      -v --version           print version information
+
+  If no timecode is given timecodes will be read from stdin.
+  For more info and examples visit: https://github.com/sshaw/Time-Timecode
+
+
+=head2 Examples
+
+=head3 Convert a 29.97 non drop frame count to a timecode
+
+  timecode -i 29.97nd -f %T 1800
+  00:01:00:00
+
+=head3 Convert 24 to 29.97 drop and output the result as frames
+
+  timecode -i 24 -c 29.97d  -f %i 00:12:33:19
+  18091
+
+=head3 Convert a list of timecodes from a file to a custom format, ignoring invalid timecodes
+
+  cat > /tmp/times.txt
+  02:01:00:12
+  foo!
+  02:02:21:00
+  02:01:00:02
+
+  timecode -qi 24 -f '%Hh %Mm %Ss and %f frames' < /tmp/times.txt
+  02:01:00:12 2h 1m 0s and 12 frames
+  02:02:21:00 2h 2m 21s and 0 frames
+  02:01:00:02 2h 1m 0s and 2 frames
 
 =head1 DEFAULTS
 

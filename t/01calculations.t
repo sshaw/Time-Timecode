@@ -2,10 +2,10 @@ use Test;
 use Time::Timecode;
 use TestHelper;
 
-BEGIN { plan tests => 93 }
+BEGIN { plan tests => 105 }
 
 # Total frames
-my $tc = Time::Timecode->new(30); 
+my $tc = Time::Timecode->new(30);
 
 # Check method aliases
 ok($tc->hh, 0);
@@ -45,6 +45,12 @@ hmsf_ok($tc, 12, 51, 28, 0);
 
 $tc = Time::Timecode->new(12, 51, 28, { dropframe => 1 });
 ok($tc->total_frames, 1387252);
+
+$tc = Time::Timecode->new(3600, { dropframe => 1, fps => 59.94 });
+hmsf_ok($tc, 0, 1, 0, 4);
+
+$tc = Time::Timecode->new(3600, { dropframe => 0, fps => 59.94 });
+hmsf_ok($tc, 0, 1, 0, 0);
 
 # Overloads
 
@@ -101,7 +107,11 @@ ok($tc1 cmp $tc2, -1);
 ok($tc1 cmp $tc1, 0);
 ok($tc2 cmp $tc1, 1);
 
+# https://rt.cpan.org/Public/Bug/Display.html?id=91181
+$tc1 = Time::Timecode->new(23,0,4,29, {dropframe => 1});
+$tc2 = Time::Timecode->new(0,0,5,0, {dropframe => 1});
+hmsf_ok($tc1 - $tc2, 22, 59, 59, 29);
+
 # Etc...
-# hours > 99
 eval { $tc =  Time::Timecode->new(1) * 2000000000000000000 };
 ok($@ =~ /invalid hours/i);

@@ -103,9 +103,7 @@ C<OPTIONS> must be a hash reference and can contain any of the following:
 
 =item * fps:
 
-Frames per second, must be greater than 0. Decimal values
-are rounded 0 places when performing calculations: 29.976 becomes 30.
-Defaults to C<$Time::Timecode::DEFAULT_FPS>
+Frames per second, must be greater than 0. Defaults to C<$Time::Timecode::DEFAULT_FPS>
 
 =item * dropframe:
 
