@@ -80,8 +80,7 @@ sub new
 
     if ($self->_is_deprecated_dropframe_rate) {
       warn<<DEPRECATION;
-Time::Timecode warning: the next version will not treat drop frame 30 and 60 like 29.97 and 59.94.
-Continuing to use drop frame 30 or 60 will result in incorrect calculations. Use 29.97 or 59.94 instead.
+Time::Timecode warning: versions > 0.3X will not treat drop frame 30 and 60 like 29.97 and 59.94. Use an fps of 29.97 or 59.94 instead.
 DEPRECATION
     }
 
@@ -109,11 +108,12 @@ sub to_string
                        f => $self->frames,
                        r => $self->fps,
 		       i => $self->total_frames,
+		       s => sprintf("%02d", $self->frames/$self->fps*100),
                        T => $tc,
                        '%'=> '%');
 
         # Match printf style formats with optional width and alignment.
-        ($tc = $format) =~ s/(%-?\d*)([THMSfri%])/sprintf "${1}s", $formats{$2}/ge
+        ($tc = $format) =~ s/(%-?\d*)([HMSfrisT%])/sprintf "${1}s", $formats{$2}/ge
     }
 
     $tc;
@@ -255,7 +255,7 @@ sub _seconds_from_frames
 sub _valid_frames
 {
     my ($part, $frames, $max) = @_;
-    Carp::croak "Invalid frames '$frames': frames must be between 0 and $max" unless $frames =~ /^\d+$/ && $frames >= 0 && $frames <= $max;
+    Carp::croak "Invalid frames '$frames': frames must be between 0 and ${ \int($max) }" unless $frames =~ /^\d+$/ && $frames >= 0 && $frames <= $max;
 }
 
 sub _valid_time_part
@@ -318,7 +318,7 @@ sub _set_timecode_from_frames
     my $fps = $self->{fps};
 
     # Support drop frame calculations for known frame rates that don't support them :(
-    # This is in place temporarily for backwards compatibility with $VERSION < 0.30,
+    # This is in place temporarily for backwards compatibility with $VERSION < 0.30 and will be removed in 0.40
     if ($self->_is_deprecated_dropframe_rate) {
         $fps = $self->{fps} == 30 ? 29.97 : 59.94;
     }
@@ -589,6 +589,8 @@ The following formats are supported:
 
 %r Frame B<r>ate
 
+%s Frames as a fraction of a second
+
 %T B<T>imecode in the L<instance's default format|/DEFAULTS>.
 
 %% Literal percent character
@@ -683,9 +685,10 @@ literal the options will be taken from the right hand side.
   print 'greater than' if $tc1 >= '02:00:12;22';
   # ....
 
-=head1 Timecode Conversion Utility Program
+=head1 TIMECODE CONVERSION UTILITY PROGRAM
 
-C<Time::Timecode> includes an executable called C<timecode> that allows one to perform timecode conversions:
+C<Time::Timecode> includes an executable called C<timecode> that allows one to perform timecode conversions
+from the command line:
 
   usage: timecode [-h] [-c spec] [-f format] [-i spec] [timecode]
       -h --help		   option help
@@ -693,7 +696,7 @@ C<Time::Timecode> includes an executable called C<timecode> that allows one to p
 			     `spec' can be a number of FPS proceeded by an optional `N' or `ND' or, a comma
 			     separated list of key=value. key can be fps, dropframe, delimiter, frame_delimiter
       -f --format  format    output timecode according to `format' e.g., '%H:%M:%S at %r FPS'.
-			     %H=hours, %M=minutes, %S=seconds, %f=frames %i=total frames, %r=frame rate
+			     %H=hours, %M=mins, %S=secs, %f=frames %i=total frames, %r=frame rate, %s=frames in secs
       -i --input   spec      process incoming timecodes according to `spec'; see -c for more info
       -q --quiet             ignore invalid timecodes
       -v --version           print version information
@@ -744,20 +747,23 @@ C<$DEFAULT_TO_STRING_FORMAT = 'HHxMMxSSxFF'>  where C<x> represents the instance
 
 =head1 AUTHOR
 
-Skye Shaw (sshaw AT lucas.cis.temple.edu)
+Skye Shaw (skye.shaw -AT- gmail)
 
 =head1 CREDITS
 
 Jinha Kim for schooling me on dropframe timecodes.
 
+L<http://andrewduncan.net/|Andrew Duncan> (and L<http://www.davidheidelberger.com/|David Heidelberger>)
+for the L<http://www.davidheidelberger.com/blog/?p=29|nice drop frame algorithm>.
+
 =head1 REFERENCES
 
 For information about dropframe timecodes see:
-L<http://dropframetimecode.org/>, L<http://en.wikipedia.org/wiki/SMPTE_time_code#Drop_frame_timecode>
+L<http://andrewduncan.net/timecodes/>, L<http://dropframetimecode.org/>, L<http://en.wikipedia.org/wiki/SMPTE_time_code#Drop_frame_timecode>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2009-2012 Skye Shaw. All rights reserved.
+Copyright (c) 2009-2016 Skye Shaw. All rights reserved.
 
 =head1 LICENSE
 
