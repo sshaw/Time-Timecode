@@ -51,11 +51,13 @@ else {
 }
 
 sub output_timecode {
-  print $_[0], ' ', $_[1], "\n";
+  # TODO: output formats
+  print "$_[0] $_[1]\n";
 }
 
 sub parse_timecode {
-  my ($value, $options) = @_;
+  my $value = shift;
+  my $options = shift || {};
   my $tc = eval { Time::Timecode->new($value, $options) };
 
   die $@ if $@ && !$quiet;
@@ -103,7 +105,7 @@ sub help {
  			   `spec' can be a number of FPS proceeded by an optional `N' or `ND' or, a comma
 		 	   separated list of key=value. key can be fps, dropframe, delimiter, frame_delimiter
     -f --format  format    output timecode according to `format' e.g., '%H:%M:%S at %r FPS'.
-			   %H=hours, %M=minutes, %S=seconds, %f=frames %i=total frames, %r=frame rate
+			   %H=hours, %M=mins, %S=secs, %f=frames, %i=total frames, %r=frame rate, %s=frames in secs
     -i --input   spec      process incoming timecodes according to `spec'; see -c for more info
     -q --quiet             ignore invalid timecodes
     -v --version           print version information
