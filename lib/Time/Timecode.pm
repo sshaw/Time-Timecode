@@ -747,7 +747,7 @@ C<$DEFAULT_TO_STRING_FORMAT = 'HHxMMxSSxFF'>  where C<x> represents the instance
 
 =head1 AUTHOR
 
-Skye Shaw (skye.shaw -AT- gmail)
+Skye Shaw (skye.shaw [AT] gmail)
 
 =head1 CREDITS
 
