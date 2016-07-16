@@ -391,6 +391,8 @@ __END__
 
 =pod
 
+=encoding UTF-8
+
 =head1 NAME
 
 Time::Timecode - Video timecode class
