@@ -755,7 +755,7 @@ C<$DEFAULT_TO_STRING_FORMAT = 'HHxMMxSSxFF'>  where C<x> represents the instance
 
 =head1 SEE ALSO
 
-=over4
+=over 2
 
 =item L<xslt-timecode|https://github.com/sshaw/xslt-timecode> - A pure, dependency free, XSLT 1.0 library for video timecode manipulation
 
