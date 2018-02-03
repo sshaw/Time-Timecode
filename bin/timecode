@@ -127,7 +127,7 @@ sub help {
   print STDERR<<HELP;
     -h --help		   option help
     -c --convert spec      convert expression according to `spec'
- 			   `spec' can be a number of FPS proceeded by an optional `D', `ND', `DF' or
+ 			   or `spec' can be a number of FPS proceeded by an optional `D', `ND', `DF'
 		 	   a comma separated list of key=value.
 			   key can be fps, dropframe, delimiter, frame_delimiter
     -f --format  format    output timecode according to `format' e.g., '%H:%M:%S at %r FPS'.

@@ -395,7 +395,7 @@ __END__
 
 =head1 NAME
 
-Time::Timecode - Video timecode class
+Time::Timecode - Video timecode class and command line program
 
 =head1 SYNOPSIS
 
@@ -707,6 +707,7 @@ and arithmetic from the command line:
 
   Expression can be a timecode, a number of frames, or an arithmetic expression composed one or both.
   If no expression is given timecode will read from stdin.
+
 =head2 Examples
 
 =head3 Convert frames to a 29.97 dropframe timecode
@@ -751,6 +752,16 @@ C<$DEFAULT_DELIMITER = ':'>
 C<$DEFAULT_FRAME_DELIMITER = ':'>
 
 C<$DEFAULT_TO_STRING_FORMAT = 'HHxMMxSSxFF'>  where C<x> represents the instance's frame and time separators.
+
+=head1 SEE ALSO
+
+=over4
+
+=item L<xslt-timecode|https://github.com/sshaw/xslt-timecode> - A pure, dependency free, XSLT 1.0 library for video timecode manipulation
+
+=item L<iTunes Store Transporter: GUI|http://transportergui.com> - GUI and workflow automation for the iTunes Store’s Transporter (iTMSTransporter)
+
+=back
 
 =head1 AUTHOR
 
