@@ -397,6 +397,8 @@ __END__
 
 Time::Timecode - Video timecode class and command line program
 
+=for html <a href="https://travis-ci.org/sshaw/Time-Timecode"><img src="https://travis-ci.org/sshaw/Time-Timecode.svg?branch=master"></a>
+
 =head1 SYNOPSIS
 
 To install the C<timecode> executable see L</TIMECODE UTILITY PROGRAM>.
