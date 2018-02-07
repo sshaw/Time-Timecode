@@ -376,6 +376,8 @@ install it: C<cpan Time::Timecode>
 
 =over 2
 
+=item L<< C<Time::Timecode source code>|https://github.com/sshaw/Time-Timecode >>
+
 =item L<xslt-timecode|https://github.com/sshaw/xslt-timecode> - A pure, dependency free, XSLT 1.0 library for video timecode manipulation
 
 =item L<iTunes Store Transporter: GUI|http://transportergui.com> - GUI and workflow automation for the iTunes Store’s Transporter (iTMSTransporter)

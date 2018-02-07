@@ -14,7 +14,7 @@ use overload
 use POSIX ();
 use Carp ();
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 our $DEFAULT_FPS = 29.97;
 our $DEFAULT_DROPFRAME = 0;
