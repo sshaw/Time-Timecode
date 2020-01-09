@@ -12,6 +12,7 @@ WriteMakefile(
 	 resources => {
 	     homepage => 'http://github.com/sshaw',
 	     bugtracker => 'http://github.com/sshaw/Time-Timecode/issues',
+	     repository => 'http://github.com/sshaw/Time-Timecode',
 	 }
       }) : ())
 );
